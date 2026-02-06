@@ -29,6 +29,13 @@ func main() {
 	st := store.New(pool)
 	rpc := chain.NewRPCClient(cfg.Chain.RPCEndpoint)
 	pricingSvc := pricing.Service{FixedCreditPerDora: cfg.Pricing.FixedCreditPerDora}
+	wsEndpoint := cfg.Chain.WSEndpoint
+	if wsEndpoint == "" {
+		wsEndpoint = chain.DefaultWSEndpoint(cfg.Chain.RPCEndpoint)
+	}
+	if wsEndpoint != "" {
+		log.Printf("ws endpoint: %s", wsEndpoint)
+	}
 
 	w := &worker.Worker{
 		Store:        st,
@@ -38,7 +45,9 @@ func main() {
 		Decimals:     cfg.Chain.Decimals,
 		ConfirmDepth: int64(cfg.Chain.ConfirmDepth),
 		StartHeight:  cfg.Worker.StartHeight,
+		RewindBlocks: cfg.Worker.RewindBlocks,
 		Interval:     20 * time.Second,
+		WSEndpoint:   wsEndpoint,
 	}
 
 	log.Printf("worker started (rpc=%s)", cfg.Chain.RPCEndpoint)

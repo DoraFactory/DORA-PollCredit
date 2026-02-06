@@ -21,6 +21,7 @@ type Config struct {
 	Chain struct {
 		ChainID      string `yaml:"chain_id"`
 		RPCEndpoint  string `yaml:"rpc_endpoint"`
+		WSEndpoint   string `yaml:"ws_endpoint"`
 		Denom        string `yaml:"denom"`
 		Decimals     int    `yaml:"decimals"`
 		Bech32Prefix string `yaml:"bech32_prefix"`
@@ -31,7 +32,8 @@ type Config struct {
 		TTLMinutes int   `yaml:"ttl_minutes"`
 	} `yaml:"orders"`
 	Worker struct {
-		StartHeight int64 `yaml:"start_height"`
+		StartHeight  int64 `yaml:"start_height"`
+		RewindBlocks int64 `yaml:"rewind_blocks"`
 	} `yaml:"worker"`
 	Pricing struct {
 		FixedCreditPerDora int64 `yaml:"fixed_credit_per_dora"`
@@ -86,6 +88,9 @@ func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("RPC_ENDPOINT"); v != "" {
 		cfg.Chain.RPCEndpoint = v
 	}
+	if v := os.Getenv("WS_ENDPOINT"); v != "" {
+		cfg.Chain.WSEndpoint = v
+	}
 	if v := os.Getenv("DENOM"); v != "" {
 		cfg.Chain.Denom = v
 	}
@@ -103,6 +108,9 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if v := os.Getenv("WORKER_START_HEIGHT"); v != "" {
 		cfg.Worker.StartHeight = atoi64Or(cfg.Worker.StartHeight, v)
+	}
+	if v := os.Getenv("WORKER_REWIND_BLOCKS"); v != "" {
+		cfg.Worker.RewindBlocks = atoi64Or(cfg.Worker.RewindBlocks, v)
 	}
 	if v := os.Getenv("FIXED_CREDIT_PER_DORA"); v != "" {
 		cfg.Pricing.FixedCreditPerDora = atoi64Or(cfg.Pricing.FixedCreditPerDora, v)

@@ -213,3 +213,52 @@ func (s *Store) UpdateOrderPayment(ctx context.Context, orderID string, status m
 	}
 	return res.RowsAffected(), nil
 }
+
+func (s *Store) GetPendingOrderByRecipient(ctx context.Context, recipient string) (*models.Order, error) {
+	row := s.Pool.QueryRow(ctx, `
+		SELECT order_id, user_id, recipient_address, derivation_index,
+			credit_requested, amount_peaka, denom, price_snapshot,
+			expires_at, status, paid_at, tx_hash, credit_issued,
+			created_at, updated_at
+		FROM orders
+		WHERE recipient_address=$1 AND status IN ('created','expired')
+		LIMIT 1
+	`, recipient)
+
+	var order models.Order
+	var paidAt sql.NullTime
+	var txHash sql.NullString
+	var creditIssued sql.NullInt64
+
+	err := row.Scan(
+		&order.OrderID,
+		&order.UserID,
+		&order.RecipientAddress,
+		&order.DerivationIndex,
+		&order.CreditRequested,
+		&order.AmountPeaka,
+		&order.Denom,
+		&order.PriceSnapshot,
+		&order.ExpiresAt,
+		&order.Status,
+		&paidAt,
+		&txHash,
+		&creditIssued,
+		&order.CreatedAt,
+		&order.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if paidAt.Valid {
+		order.PaidAt = &paidAt.Time
+	}
+	if txHash.Valid {
+		order.TxHash = &txHash.String
+	}
+	if creditIssued.Valid {
+		order.CreditIssued = &creditIssued.Int64
+	}
+	return &order, nil
+}

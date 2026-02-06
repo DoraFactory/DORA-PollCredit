@@ -22,10 +22,13 @@ type Worker struct {
 	Decimals     int
 	ConfirmDepth int64
 	StartHeight  int64
+	RewindBlocks int64
 	Interval     time.Duration
+	WSEndpoint   string
 }
 
 func (w *Worker) Run(ctx context.Context) {
+	go w.RunWS(ctx)
 	ticker := time.NewTicker(w.Interval)
 	defer ticker.Stop()
 
@@ -59,6 +62,12 @@ func (w *Worker) SyncOnce(ctx context.Context) error {
 	if last == 0 {
 		if w.StartHeight > 0 {
 			from = w.StartHeight
+		} else {
+			from = 1
+		}
+	} else if w.RewindBlocks > 0 {
+		if last > w.RewindBlocks {
+			from = last - w.RewindBlocks + 1
 		} else {
 			from = 1
 		}
@@ -115,12 +124,13 @@ func (w *Worker) scanOrder(ctx context.Context, order *models.Order, from, to in
 				if tx.Code != 0 {
 					continue
 				}
-				amount, sender, ok := findTransferForRecipient(tx.Events, order.RecipientAddress, order.Denom)
-				if !ok {
-					continue
-				}
-				if err := w.applyPayment(ctx, order, tx, amount, sender); err != nil {
-					log.Printf("apply payment failed order=%s tx=%s: %v", order.OrderID, tx.Hash, err)
+				for _, t := range extractTransfers(tx.Events, order.Denom) {
+					if t.Recipient != order.RecipientAddress {
+						continue
+					}
+					if err := w.applyPayment(ctx, order, tx, t.Amount, t.Sender); err != nil {
+						log.Printf("apply payment failed order=%s tx=%s: %v", order.OrderID, tx.Hash, err)
+					}
 				}
 			}
 
@@ -208,49 +218,6 @@ func (w *Worker) calcLateCredit(paidPeaka string) (int64, error) {
 
 func buildRecipientQuery(key, addr string) string {
 	return key + "='" + addr + "'"
-}
-
-func findTransferForRecipient(events []chain.Event, recipient string, denom string) (amount string, sender string, ok bool) {
-	for _, ev := range events {
-		switch ev.Type {
-		case "transfer":
-			var amt string
-			var rec string
-			var snd string
-			for _, attr := range ev.Attributes {
-				switch attr.Key {
-				case "amount":
-					amt = attr.Value
-				case "recipient":
-					rec = attr.Value
-				case "sender":
-					snd = attr.Value
-				}
-			}
-			if rec == recipient {
-				if parsed, ok := parseAmountForDenom(amt, denom); ok {
-					return parsed, snd, true
-				}
-			}
-		case "coin_received":
-			var amt string
-			var rec string
-			for _, attr := range ev.Attributes {
-				switch attr.Key {
-				case "amount":
-					amt = attr.Value
-				case "receiver":
-					rec = attr.Value
-				}
-			}
-			if rec == recipient {
-				if parsed, ok := parseAmountForDenom(amt, denom); ok {
-					return parsed, "", true
-				}
-			}
-		}
-	}
-	return "", "", false
 }
 
 func parseAmountForDenom(amount string, denom string) (string, bool) {

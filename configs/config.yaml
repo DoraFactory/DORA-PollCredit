@@ -10,6 +10,7 @@ wallet:
 chain:
   chain_id: "vota-testnet"
   rpc_endpoint: "https://vota-testnet-rpc.dorafactory.org/"
+  ws_endpoint: ""
   denom: "peaka"
   decimals: 18
   bech32_prefix: "dora"
@@ -21,6 +22,7 @@ orders:
 
 worker:
   start_height: 11450743
+  rewind_blocks: 0
 
 pricing:
   fixed_credit_per_dora: 100
