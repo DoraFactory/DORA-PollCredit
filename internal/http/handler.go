@@ -32,7 +32,9 @@ type createOrderResponse struct {
 type orderResponse struct {
 	Status           string `json:"status"`
 	AmountPeaka      string `json:"amountPeaka"`
+	Denom            string `json:"denom"`
 	RecipientAddress string `json:"recipientAddress"`
+	ExpiresAt        string `json:"expiresAt,omitempty"`
 	PaidAt           string `json:"paidAt,omitempty"`
 	TxHash           string `json:"txHash,omitempty"`
 	CreditIssued     *int64 `json:"creditIssued,omitempty"`
@@ -96,9 +98,11 @@ func (h *Handler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	resp := orderResponse{
 		Status:           string(order.Status),
 		AmountPeaka:      order.AmountPeaka,
+		Denom:            order.Denom,
 		RecipientAddress: order.RecipientAddress,
 		CreditIssued:     order.CreditIssued,
 	}
+	resp.ExpiresAt = order.ExpiresAt.Format(time.RFC3339)
 	if order.PaidAt != nil {
 		resp.PaidAt = order.PaidAt.Format(time.RFC3339)
 	}

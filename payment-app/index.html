@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DORA Poll Credit | 购买</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./assets/styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div>
+          <span class="badge">DORA Pay</span>
+          <h1>购买 Poll Credit</h1>
+          <p>输入购买数量，系统会创建订单并跳转到支付页面完成 Keplr 支付。</p>
+          <p>当前演示使用固定汇率：1 DORA = 100 Credit。</p>
+        </div>
+        <div class="card">
+          <h2>创建订单</h2>
+          <form class="form" id="orderForm">
+            <label>
+              API Base
+              <input id="apiBase" type="url" value="http://localhost:8080" required />
+            </label>
+            <label>
+              User ID
+              <input id="userId" type="text" value="user_demo" required />
+            </label>
+            <label>
+              购买 Credit 数量
+              <input id="credit" type="number" min="10000" step="1" value="10000" required />
+            </label>
+            <button class="primary" type="submit">创建订单并前往支付</button>
+            <div class="status" id="orderStatus" hidden></div>
+          </form>
+        </div>
+      </section>
+
+      <section class="grid">
+        <div class="card">
+          <h2>最近状态</h2>
+          <div class="kv" id="lastStatus">暂无记录</div>
+        </div>
+        <div class="card">
+          <h2>提示</h2>
+          <div class="kv">
+            <div>最小购买</div>
+            <span>10000 Credit</span>
+            <div>链信息</div>
+            <span>vota-testnet / peaka</span>
+            <div>钱包</div>
+            <span>Keplr 浏览器插件</span>
+          </div>
+        </div>
+      </section>
+
+      <p class="footer">提示：如果支付页与 API 不同域名，需后端开启 CORS。</p>
+    </main>
+    <script type="module" src="./assets/purchase.js"></script>
+  </body>
+</html>

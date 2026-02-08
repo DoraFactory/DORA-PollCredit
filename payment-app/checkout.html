@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DORA Poll Credit | 支付</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./assets/styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div>
+          <span class="badge">Secure Checkout</span>
+          <h1>使用 Keplr 完成支付</h1>
+          <p>确认订单信息后，连接钱包并发送交易。</p>
+          <p>支付完成后会自动返回购买页。</p>
+        </div>
+        <div class="card">
+          <h2>订单信息</h2>
+          <div class="kv" id="orderDetails">加载中...</div>
+          <div class="actions" style="margin-top: 18px">
+            <button class="primary" id="payBtn">连接钱包并支付</button>
+            <button class="secondary" id="checkBtn">刷新状态</button>
+            <button class="secondary" id="backBtn">返回购买页</button>
+          </div>
+          <div class="status" id="statusBox" hidden></div>
+        </div>
+      </section>
+
+      <section class="grid">
+        <div class="card">
+          <h2>交易回执</h2>
+          <div class="kv" id="txDetails">暂无</div>
+        </div>
+        <div class="card">
+          <h2>注意事项</h2>
+          <div class="kv">
+            <div>订单有效期</div>
+            <span>10 分钟（超时仍可支付，按最新汇率结算）</span>
+            <div>手续费</div>
+            <span>由用户钱包承担</span>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="./assets/checkout.js"></script>
+  </body>
+</html>
