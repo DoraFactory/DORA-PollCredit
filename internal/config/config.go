@@ -32,8 +32,11 @@ type Config struct {
 		TTLMinutes int   `yaml:"ttl_minutes"`
 	} `yaml:"orders"`
 	Worker struct {
-		StartHeight  int64 `yaml:"start_height"`
-		RewindBlocks int64 `yaml:"rewind_blocks"`
+		StartHeight      int64 `yaml:"start_height"`
+		RewindBlocks     int64 `yaml:"rewind_blocks"`
+		MaxBlocksPerTick int64 `yaml:"max_blocks_per_tick"`
+		IntervalSeconds  int64 `yaml:"interval_seconds"`
+		PerPage          int   `yaml:"per_page"`
 	} `yaml:"worker"`
 	Pricing struct {
 		FixedCreditPerDora int64 `yaml:"fixed_credit_per_dora"`
@@ -111,6 +114,15 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if v := os.Getenv("WORKER_REWIND_BLOCKS"); v != "" {
 		cfg.Worker.RewindBlocks = atoi64Or(cfg.Worker.RewindBlocks, v)
+	}
+	if v := os.Getenv("WORKER_MAX_BLOCKS_PER_TICK"); v != "" {
+		cfg.Worker.MaxBlocksPerTick = atoi64Or(cfg.Worker.MaxBlocksPerTick, v)
+	}
+	if v := os.Getenv("WORKER_INTERVAL_SECONDS"); v != "" {
+		cfg.Worker.IntervalSeconds = atoi64Or(cfg.Worker.IntervalSeconds, v)
+	}
+	if v := os.Getenv("WORKER_PER_PAGE"); v != "" {
+		cfg.Worker.PerPage = atoiOr(cfg.Worker.PerPage, v)
 	}
 	if v := os.Getenv("FIXED_CREDIT_PER_DORA"); v != "" {
 		cfg.Pricing.FixedCreditPerDora = atoi64Or(cfg.Pricing.FixedCreditPerDora, v)
