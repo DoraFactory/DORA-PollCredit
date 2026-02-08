@@ -22,7 +22,10 @@ orders:
 
 worker:
   start_height: 11450743
-  rewind_blocks: 0
+  rewind_blocks: 200
+  max_blocks_per_tick: 2000
+  interval_seconds: 20
+  per_page: 30
 
 pricing:
   fixed_credit_per_dora: 100

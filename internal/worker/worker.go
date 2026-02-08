@@ -20,11 +20,13 @@ type Worker struct {
 	Pricing      pricing.Service
 	Denom        string
 	Decimals     int
-	ConfirmDepth int64
-	StartHeight  int64
-	RewindBlocks int64
-	Interval     time.Duration
-	WSEndpoint   string
+	ConfirmDepth     int64
+	StartHeight      int64
+	RewindBlocks     int64
+	MaxBlocksPerTick int64
+	PerPage          int
+	Interval         time.Duration
+	WSEndpoint       string
 }
 
 func (w *Worker) Run(ctx context.Context) {
@@ -75,6 +77,12 @@ func (w *Worker) SyncOnce(ctx context.Context) error {
 	if from > to {
 		return nil
 	}
+	if w.MaxBlocksPerTick > 0 {
+		limitTo := from + w.MaxBlocksPerTick - 1
+		if limitTo < to {
+			to = limitTo
+		}
+	}
 
 	if err := w.Store.MarkExpired(ctx, time.Now().UTC()); err != nil {
 		return err
@@ -106,8 +114,11 @@ func (w *Worker) SyncOnce(ctx context.Context) error {
 func (w *Worker) scanOrder(ctx context.Context, order *models.Order, from, to int64) error {
 	for _, key := range []string{"transfer.recipient", "coin_received.receiver"} {
 		query := buildRecipientQuery(key, order.RecipientAddress)
-		page := 1
-		perPage := 30
+			page := 1
+			perPage := w.PerPage
+			if perPage <= 0 {
+				perPage = 30
+			}
 
 		for {
 			res, err := w.Chain.TxSearch(ctx, query, page, perPage)

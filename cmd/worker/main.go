@@ -13,6 +13,13 @@ import (
 	"DORAPollCredit/internal/worker"
 )
 
+func max64(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 func main() {
 	cfg, err := config.Load("")
 	if err != nil {
@@ -46,7 +53,9 @@ func main() {
 		ConfirmDepth: int64(cfg.Chain.ConfirmDepth),
 		StartHeight:  cfg.Worker.StartHeight,
 		RewindBlocks: cfg.Worker.RewindBlocks,
-		Interval:     20 * time.Second,
+		MaxBlocksPerTick: cfg.Worker.MaxBlocksPerTick,
+		PerPage:          cfg.Worker.PerPage,
+		Interval:         time.Duration(max64(cfg.Worker.IntervalSeconds, 1)) * time.Second,
 		WSEndpoint:   wsEndpoint,
 	}
 
