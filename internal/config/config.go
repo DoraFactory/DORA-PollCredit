@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -19,24 +20,27 @@ type Config struct {
 		XPub string `yaml:"xpub"`
 	} `yaml:"wallet"`
 	Chain struct {
-		ChainID      string `yaml:"chain_id"`
-		RPCEndpoint  string `yaml:"rpc_endpoint"`
-		WSEndpoint   string `yaml:"ws_endpoint"`
-		Denom        string `yaml:"denom"`
-		Decimals     int    `yaml:"decimals"`
-		Bech32Prefix string `yaml:"bech32_prefix"`
-		ConfirmDepth int    `yaml:"confirm_depth"`
+		ChainID      string   `yaml:"chain_id"`
+		RPCEndpoints []string `yaml:"rpc_endpoints"`
+		WSEndpoints  []string `yaml:"ws_endpoints"`
+		Denom        string   `yaml:"denom"`
+		Decimals     int      `yaml:"decimals"`
+		Bech32Prefix string   `yaml:"bech32_prefix"`
+		ConfirmDepth int      `yaml:"confirm_depth"`
 	} `yaml:"chain"`
 	Orders struct {
 		MinCredit  int64 `yaml:"min_credit"`
 		TTLMinutes int   `yaml:"ttl_minutes"`
 	} `yaml:"orders"`
 	Worker struct {
-		StartHeight      int64 `yaml:"start_height"`
-		RewindBlocks     int64 `yaml:"rewind_blocks"`
-		MaxBlocksPerTick int64 `yaml:"max_blocks_per_tick"`
-		IntervalSeconds  int64 `yaml:"interval_seconds"`
-		PerPage          int   `yaml:"per_page"`
+		StartHeight          int64 `yaml:"start_height"`
+		RewindBlocks         int64 `yaml:"rewind_blocks"`
+		MaxBlocksPerTick     int64 `yaml:"max_blocks_per_tick"`
+		IntervalSeconds      int64 `yaml:"interval_seconds"`
+		PerPage              int   `yaml:"per_page"`
+		WSBackfillBlocks     int64 `yaml:"ws_backfill_blocks"`
+		RPCFailoverThreshold int   `yaml:"rpc_failover_threshold"`
+		WSFailoverThreshold  int   `yaml:"ws_failover_threshold"`
 	} `yaml:"worker"`
 	Pricing struct {
 		FixedCreditPerDora int64 `yaml:"fixed_credit_per_dora"`
@@ -69,7 +73,7 @@ func Load(path string) (*Config, error) {
 	if cfg.DB.DSN == "" {
 		return nil, errors.New("db.dsn is required")
 	}
-	if cfg.Chain.ChainID == "" || cfg.Chain.RPCEndpoint == "" || cfg.Chain.Denom == "" {
+	if cfg.Chain.ChainID == "" || len(cfg.Chain.RPCEndpoints) == 0 || cfg.Chain.Denom == "" {
 		return nil, errors.New("chain config is incomplete")
 	}
 	return &cfg, nil
@@ -88,11 +92,11 @@ func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("CHAIN_ID"); v != "" {
 		cfg.Chain.ChainID = v
 	}
-	if v := os.Getenv("RPC_ENDPOINT"); v != "" {
-		cfg.Chain.RPCEndpoint = v
+	if v := os.Getenv("RPC_ENDPOINTS"); v != "" {
+		cfg.Chain.RPCEndpoints = splitCommaList(v)
 	}
-	if v := os.Getenv("WS_ENDPOINT"); v != "" {
-		cfg.Chain.WSEndpoint = v
+	if v := os.Getenv("WS_ENDPOINTS"); v != "" {
+		cfg.Chain.WSEndpoints = splitCommaList(v)
 	}
 	if v := os.Getenv("DENOM"); v != "" {
 		cfg.Chain.Denom = v
@@ -124,9 +128,31 @@ func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("WORKER_PER_PAGE"); v != "" {
 		cfg.Worker.PerPage = atoiOr(cfg.Worker.PerPage, v)
 	}
+	if v := os.Getenv("WORKER_WS_BACKFILL_BLOCKS"); v != "" {
+		cfg.Worker.WSBackfillBlocks = atoi64Or(cfg.Worker.WSBackfillBlocks, v)
+	}
+	if v := os.Getenv("WORKER_RPC_FAILOVER_THRESHOLD"); v != "" {
+		cfg.Worker.RPCFailoverThreshold = atoiOr(cfg.Worker.RPCFailoverThreshold, v)
+	}
+	if v := os.Getenv("WORKER_WS_FAILOVER_THRESHOLD"); v != "" {
+		cfg.Worker.WSFailoverThreshold = atoiOr(cfg.Worker.WSFailoverThreshold, v)
+	}
 	if v := os.Getenv("FIXED_CREDIT_PER_DORA"); v != "" {
 		cfg.Pricing.FixedCreditPerDora = atoi64Or(cfg.Pricing.FixedCreditPerDora, v)
 	}
+}
+
+func splitCommaList(v string) []string {
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 func atoiOr(fallback int, v string) int {

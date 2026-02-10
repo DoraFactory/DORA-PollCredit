@@ -9,8 +9,9 @@ wallet:
 
 chain:
   chain_id: "vota-testnet"
-  rpc_endpoint: "https://vota-testnet-rpc.dorafactory.org/"
-  ws_endpoint: ""
+  rpc_endpoints:
+    - "https://vota-testnet-rpc.dorafactory.org/"
+  ws_endpoints: []
   denom: "peaka"
   decimals: 18
   bech32_prefix: "dora"
@@ -23,6 +24,9 @@ orders:
 worker:
   start_height: 11450743
   rewind_blocks: 200
+  ws_backfill_blocks: 200
+  rpc_failover_threshold: 3
+  ws_failover_threshold: 3
   max_blocks_per_tick: 2000
   interval_seconds: 20
   per_page: 30

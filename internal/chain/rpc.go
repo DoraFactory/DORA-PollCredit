@@ -19,11 +19,21 @@ type RPCClient struct {
 	client  *http.Client
 }
 
+type Client interface {
+	LatestHeight(ctx context.Context) (int64, error)
+	TxSearch(ctx context.Context, query string, page, perPage int) (*TxSearchResult, error)
+	BaseURL() string
+}
+
 func NewRPCClient(baseURL string) *RPCClient {
 	return &RPCClient{
 		baseURL: strings.TrimRight(baseURL, "/"),
 		client:  &http.Client{Timeout: 10 * time.Second},
 	}
+}
+
+func (c *RPCClient) BaseURL() string {
+	return c.baseURL
 }
 
 func (c *RPCClient) LatestHeight(ctx context.Context) (int64, error) {
@@ -169,9 +179,9 @@ type txSearchResponse struct {
 }
 
 type rpcTx struct {
-	Hash      string     `json:"hash"`
-	Height    string     `json:"height"`
-	Timestamp string     `json:"timestamp"`
+	Hash      string      `json:"hash"`
+	Height    string      `json:"height"`
+	Timestamp string      `json:"timestamp"`
 	TxResult  rpcTxResult `json:"tx_result"`
 }
 
@@ -181,7 +191,7 @@ type rpcTxResult struct {
 }
 
 type rpcEvent struct {
-	Type       string        `json:"type"`
+	Type       string         `json:"type"`
 	Attributes []rpcAttribute `json:"attributes"`
 }
 
