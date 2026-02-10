@@ -12,10 +12,28 @@ import (
 )
 
 func (w *Worker) RunWS(ctx context.Context) {
-	if w.WSEndpoint == "" {
-		log.Printf("ws disabled: ws_endpoint is empty")
+	if len(w.WSEndpoints) == 0 {
+		log.Printf("ws disabled: ws_endpoints is empty")
 		return
 	}
+
+	backfillBlocks := w.WSBackfillBlocks
+	if backfillBlocks <= 0 {
+		backfillBlocks = w.RewindBlocks
+	}
+	if backfillBlocks < 0 {
+		backfillBlocks = 0
+	}
+
+	failoverThreshold := w.WSFailoverThreshold
+	if failoverThreshold <= 0 {
+		failoverThreshold = 3
+	}
+
+	index := 0
+	failCount := 0
+	backoff := 2 * time.Second
+	maxBackoff := 30 * time.Second
 
 	for {
 		select {
@@ -24,26 +42,57 @@ func (w *Worker) RunWS(ctx context.Context) {
 		default:
 		}
 
-		client := chain.NewWSClient(w.WSEndpoint)
+		endpoint := w.WSEndpoints[index]
+		client := chain.NewWSClient(endpoint)
 		if err := client.Connect(ctx); err != nil {
-			log.Printf("ws connect failed: %v", err)
-			time.Sleep(3 * time.Second)
+			log.Printf("ws connect failed (%s): %v", endpoint, err)
+			failCount++
+			if failCount >= failoverThreshold && len(w.WSEndpoints) > 1 {
+				index = (index + 1) % len(w.WSEndpoints)
+				failCount = 0
+				log.Printf("ws failover -> %s", w.WSEndpoints[index])
+			}
+			time.Sleep(backoff)
+			if backoff < maxBackoff {
+				backoff *= 2
+				if backoff > maxBackoff {
+					backoff = maxBackoff
+				}
+			}
 			continue
 		}
-		log.Printf("ws connected %s", w.WSEndpoint)
+		log.Printf("ws connected %s", endpoint)
+		backoff = 2 * time.Second
+		failCount = 0
 
 		if err := client.Subscribe(ctx, "tm.event='Tx'"); err != nil {
-			log.Printf("ws subscribe failed: %v", err)
+			log.Printf("ws subscribe failed (%s): %v", endpoint, err)
 			client.Close()
-			time.Sleep(3 * time.Second)
+			failCount++
+			if failCount >= failoverThreshold && len(w.WSEndpoints) > 1 {
+				index = (index + 1) % len(w.WSEndpoints)
+				failCount = 0
+				log.Printf("ws failover -> %s", w.WSEndpoints[index])
+			}
+			time.Sleep(backoff)
 			continue
+		}
+
+		if backfillBlocks > 0 {
+			w.BackfillRecent(ctx, backfillBlocks)
 		}
 
 		for {
 			msg, err := client.Read(ctx)
 			if err != nil {
-				log.Printf("ws read failed: %v", err)
+				log.Printf("ws read failed (%s): %v", endpoint, err)
 				client.Close()
+				failCount++
+				if failCount >= failoverThreshold && len(w.WSEndpoints) > 1 {
+					index = (index + 1) % len(w.WSEndpoints)
+					failCount = 0
+					log.Printf("ws failover -> %s", w.WSEndpoints[index])
+				}
 				break
 			}
 
@@ -71,6 +120,12 @@ func (w *Worker) RunWS(ctx context.Context) {
 			}
 		}
 
-		time.Sleep(2 * time.Second)
+		time.Sleep(backoff)
+		if backoff < maxBackoff {
+			backoff *= 2
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+		}
 	}
 }

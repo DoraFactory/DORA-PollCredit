@@ -15,18 +15,20 @@ import (
 )
 
 type Worker struct {
-	Store        *store.Store
-	Chain        *chain.RPCClient
-	Pricing      pricing.Service
-	Denom        string
-	Decimals     int
-	ConfirmDepth     int64
-	StartHeight      int64
-	RewindBlocks     int64
-	MaxBlocksPerTick int64
-	PerPage          int
-	Interval         time.Duration
-	WSEndpoint       string
+	Store               *store.Store
+	Chain               chain.Client
+	Pricing             pricing.Service
+	Denom               string
+	Decimals            int
+	ConfirmDepth        int64
+	StartHeight         int64
+	RewindBlocks        int64
+	MaxBlocksPerTick    int64
+	PerPage             int
+	Interval            time.Duration
+	WSEndpoints         []string
+	WSBackfillBlocks    int64
+	WSFailoverThreshold int
 }
 
 func (w *Worker) Run(ctx context.Context) {
@@ -88,37 +90,66 @@ func (w *Worker) SyncOnce(ctx context.Context) error {
 		return err
 	}
 
+	if err := w.scanRange(ctx, from, to); err != nil {
+		return err
+	}
+
+	return w.Store.SetSyncHeight(ctx, to)
+}
+
+func (w *Worker) BackfillRecent(ctx context.Context, blocks int64) {
+	if blocks <= 0 {
+		return
+	}
+	latest, err := w.Chain.LatestHeight(ctx)
+	if err != nil {
+		log.Printf("ws backfill latest height failed: %v", err)
+		return
+	}
+	to := latest - w.ConfirmDepth
+	if to <= 0 {
+		return
+	}
+	from := to - blocks + 1
+	if from < 1 {
+		from = 1
+	}
+	log.Printf("ws backfill range=%d..%d", from, to)
+	if err := w.scanRange(ctx, from, to); err != nil {
+		log.Printf("ws backfill failed: %v", err)
+	}
+}
+
+func (w *Worker) scanRange(ctx context.Context, from, to int64) error {
 	orders, err := w.Store.ListPendingOrders(ctx)
 	if err != nil {
 		return err
 	}
 	if len(orders) == 0 {
 		log.Printf("sync range=%d..%d pending=0", from, to)
-	} else {
-		ids := make([]string, 0, len(orders))
-		for _, order := range orders {
-			ids = append(ids, order.OrderID)
-		}
-		log.Printf("sync range=%d..%d pending=%d ids=%s", from, to, len(orders), strings.Join(ids, ","))
+		return nil
 	}
-
+	ids := make([]string, 0, len(orders))
+	for _, order := range orders {
+		ids = append(ids, order.OrderID)
+	}
+	log.Printf("sync range=%d..%d pending=%d ids=%s", from, to, len(orders), strings.Join(ids, ","))
 	for _, order := range orders {
 		if err := w.scanOrder(ctx, order, from, to); err != nil {
 			log.Printf("scan order %s failed: %v", order.OrderID, err)
 		}
 	}
-
-	return w.Store.SetSyncHeight(ctx, to)
+	return nil
 }
 
 func (w *Worker) scanOrder(ctx context.Context, order *models.Order, from, to int64) error {
 	for _, key := range []string{"transfer.recipient", "coin_received.receiver"} {
 		query := buildRecipientQuery(key, order.RecipientAddress)
-			page := 1
-			perPage := w.PerPage
-			if perPage <= 0 {
-				perPage = 30
-			}
+		page := 1
+		perPage := w.PerPage
+		if perPage <= 0 {
+			perPage = 30
+		}
 
 		for {
 			res, err := w.Chain.TxSearch(ctx, query, page, perPage)
