@@ -17,6 +17,7 @@ func NewServer(handler *Handler) *Server {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Logger)
+	r.Use(cors)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
