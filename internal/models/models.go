@@ -9,6 +9,7 @@ const (
 	OrderPaid            OrderStatus = "paid"
 	OrderExpired         OrderStatus = "expired"
 	OrderPaidLateReprice OrderStatus = "paid_late_repriced"
+	OrderLateNoCredit    OrderStatus = "late_no_credit"
 	OrderUnderpaid       OrderStatus = "underpaid"
 	OrderOverpaid        OrderStatus = "overpaid"
 )

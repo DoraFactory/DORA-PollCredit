@@ -8,7 +8,6 @@ import (
 	"DORAPollCredit/internal/chain"
 	"DORAPollCredit/internal/config"
 	"DORAPollCredit/internal/db"
-	"DORAPollCredit/internal/pricing"
 	"DORAPollCredit/internal/store"
 	"DORAPollCredit/internal/worker"
 )
@@ -49,7 +48,6 @@ func main() {
 	} else {
 		rpc = chain.NewRPCClient(rpcEndpoints[0])
 	}
-	pricingSvc := pricing.Service{FixedCreditPerDora: cfg.Pricing.FixedCreditPerDora}
 	wsEndpoints := cfg.Chain.WSEndpoints
 	if len(wsEndpoints) == 0 {
 		for _, rpcEndpoint := range rpcEndpoints {
@@ -65,7 +63,6 @@ func main() {
 	w := &worker.Worker{
 		Store:               st,
 		Chain:               rpc,
-		Pricing:             pricingSvc,
 		Denom:               cfg.Chain.Denom,
 		Decimals:            cfg.Chain.Decimals,
 		ConfirmDepth:        int64(cfg.Chain.ConfirmDepth),

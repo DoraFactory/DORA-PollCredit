@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"time"
 )
 
 type MultiRPCClient struct {
@@ -89,6 +90,56 @@ func (m *MultiRPCClient) TxSearch(ctx context.Context, query string, page, perPa
 		}
 	}
 	return nil, lastErr
+}
+
+func (m *MultiRPCClient) TxByHash(ctx context.Context, hash string) (*Tx, error) {
+	m.mu.Lock()
+	start := m.index
+	m.mu.Unlock()
+
+	var lastErr error
+	for attempts := 0; attempts < len(m.clients); attempts++ {
+		client, idx := m.currentClient()
+		out, err := client.TxByHash(ctx, hash)
+		if err == nil {
+			m.resetFailures(idx)
+			return out, nil
+		}
+		lastErr = err
+		m.noteFailure(idx)
+		if m.shouldRotate() || len(m.clients) > 1 {
+			m.rotate()
+		}
+		if idx == start && attempts > 0 {
+			break
+		}
+	}
+	return nil, lastErr
+}
+
+func (m *MultiRPCClient) BlockTime(ctx context.Context, height int64) (time.Time, error) {
+	m.mu.Lock()
+	start := m.index
+	m.mu.Unlock()
+
+	var lastErr error
+	for attempts := 0; attempts < len(m.clients); attempts++ {
+		client, idx := m.currentClient()
+		out, err := client.BlockTime(ctx, height)
+		if err == nil {
+			m.resetFailures(idx)
+			return out, nil
+		}
+		lastErr = err
+		m.noteFailure(idx)
+		if m.shouldRotate() || len(m.clients) > 1 {
+			m.rotate()
+		}
+		if idx == start && attempts > 0 {
+			break
+		}
+	}
+	return time.Time{}, lastErr
 }
 
 func (m *MultiRPCClient) currentClient() (*RPCClient, int) {
