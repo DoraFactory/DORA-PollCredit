@@ -29,5 +29,11 @@ func NewServer(handler *Handler) *Server {
 		r.Post("/confirm", handler.ConfirmPayment)
 	})
 
+	r.Route("/admin", func(r chi.Router) {
+		r.Get("/orders", handler.AdminListOrders)
+		r.Get("/orders/{orderId}", handler.AdminGetOrder)
+		r.Post("/verify-tx", handler.AdminVerifyTx)
+	})
+
 	return &Server{Router: r}
 }

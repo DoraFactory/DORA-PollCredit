@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"DORAPollCredit/internal/chain"
+	"DORAPollCredit/internal/payments"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -105,7 +106,7 @@ func (w *Worker) RunWS(ctx context.Context) {
 				continue
 			}
 
-			for _, t := range extractTransfers(tx.Events, w.Denom) {
+			for _, t := range payments.ExtractTransfers(tx.Events, w.Denom) {
 				order, err := w.Store.GetPendingOrderByRecipient(ctx, t.Recipient)
 				if err != nil {
 					if errors.Is(err, pgx.ErrNoRows) {

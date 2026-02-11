@@ -22,6 +22,8 @@ type RPCClient struct {
 type Client interface {
 	LatestHeight(ctx context.Context) (int64, error)
 	TxSearch(ctx context.Context, query string, page, perPage int) (*TxSearchResult, error)
+	TxByHash(ctx context.Context, hash string) (*Tx, error)
+	BlockTime(ctx context.Context, height int64) (time.Time, error)
 	BaseURL() string
 }
 
@@ -92,6 +94,49 @@ func (c *RPCClient) TxSearch(ctx context.Context, query string, page, perPage in
 		})
 	}
 	return result, nil
+}
+
+func (c *RPCClient) TxByHash(ctx context.Context, hash string) (*Tx, error) {
+	h := strings.TrimSpace(hash)
+	if h == "" {
+		return nil, errors.New("empty tx hash")
+	}
+	h = strings.TrimPrefix(strings.ToUpper(h), "0X")
+	endpoint := c.baseURL + "/tx?hash=0x" + h
+	var resp txByHashResponse
+	if err := c.getJSON(ctx, endpoint, &resp); err != nil {
+		return nil, err
+	}
+
+	height, err := parseInt64(resp.Result.Height)
+	if err != nil {
+		return nil, err
+	}
+	txHash := strings.TrimSpace(resp.Result.Hash)
+	if txHash == "" {
+		txHash = h
+	}
+
+	return &Tx{
+		Hash:      strings.ToUpper(txHash),
+		Height:    height,
+		Code:      resp.Result.TxResult.Code,
+		Events:    decodeEvents(resp.Result.TxResult.Events),
+		Timestamp: time.Time{},
+	}, nil
+}
+
+func (c *RPCClient) BlockTime(ctx context.Context, height int64) (time.Time, error) {
+	endpoint := c.baseURL + "/block?height=" + strconv.FormatInt(height, 10)
+	var resp blockResponse
+	if err := c.getJSON(ctx, endpoint, &resp); err != nil {
+		return time.Time{}, err
+	}
+	t, err := time.Parse(time.RFC3339, resp.Result.Block.Header.Time)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return t, nil
 }
 
 func (c *RPCClient) getJSON(ctx context.Context, endpoint string, out any) error {
@@ -175,6 +220,24 @@ type txSearchResponse struct {
 	Result struct {
 		TotalCount string  `json:"total_count"`
 		Txs        []rpcTx `json:"txs"`
+	} `json:"result"`
+}
+
+type txByHashResponse struct {
+	Result struct {
+		Hash     string      `json:"hash"`
+		Height   string      `json:"height"`
+		TxResult rpcTxResult `json:"tx_result"`
+	} `json:"result"`
+}
+
+type blockResponse struct {
+	Result struct {
+		Block struct {
+			Header struct {
+				Time string `json:"time"`
+			} `json:"header"`
+		} `json:"block"`
 	} `json:"result"`
 }
 

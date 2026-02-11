@@ -127,8 +127,89 @@ func (s *Store) ListPendingOrders(ctx context.Context) ([]*models.Order, error) 
 			expires_at, status, paid_at, tx_hash, credit_issued,
 			created_at, updated_at
 		FROM orders
-		WHERE status IN ('created','expired')
+		WHERE status IN ('created')
 	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []*models.Order
+	for rows.Next() {
+		var order models.Order
+		var paidAt sql.NullTime
+		var txHash sql.NullString
+		var creditIssued sql.NullInt64
+		if err := rows.Scan(
+			&order.OrderID,
+			&order.UserID,
+			&order.RecipientAddress,
+			&order.DerivationIndex,
+			&order.CreditRequested,
+			&order.AmountPeaka,
+			&order.Denom,
+			&order.PriceSnapshot,
+			&order.ExpiresAt,
+			&order.Status,
+			&paidAt,
+			&txHash,
+			&creditIssued,
+			&order.CreatedAt,
+			&order.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		if paidAt.Valid {
+			order.PaidAt = &paidAt.Time
+		}
+		if txHash.Valid {
+			order.TxHash = &txHash.String
+		}
+		if creditIssued.Valid {
+			order.CreditIssued = &creditIssued.Int64
+		}
+		orders = append(orders, &order)
+	}
+	return orders, rows.Err()
+}
+
+func (s *Store) ListOrdersByStatus(ctx context.Context, status string, limit, offset int) ([]*models.Order, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	var (
+		rows pgx.Rows
+		err  error
+	)
+	if status == "" {
+		rows, err = s.Pool.Query(ctx, `
+			SELECT order_id, user_id, recipient_address, derivation_index,
+				credit_requested, amount_peaka, denom, price_snapshot,
+				expires_at, status, paid_at, tx_hash, credit_issued,
+				created_at, updated_at
+			FROM orders
+			ORDER BY created_at DESC
+			LIMIT $1 OFFSET $2
+		`, limit, offset)
+	} else {
+		rows, err = s.Pool.Query(ctx, `
+			SELECT order_id, user_id, recipient_address, derivation_index,
+				credit_requested, amount_peaka, denom, price_snapshot,
+				expires_at, status, paid_at, tx_hash, credit_issued,
+				created_at, updated_at
+			FROM orders
+			WHERE status=$1
+			ORDER BY created_at DESC
+			LIMIT $2 OFFSET $3
+		`, status, limit, offset)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +302,57 @@ func (s *Store) GetPendingOrderByRecipient(ctx context.Context, recipient string
 			expires_at, status, paid_at, tx_hash, credit_issued,
 			created_at, updated_at
 		FROM orders
-		WHERE recipient_address=$1 AND status IN ('created','expired')
+		WHERE recipient_address=$1 AND status IN ('created')
+		LIMIT 1
+	`, recipient)
+
+	var order models.Order
+	var paidAt sql.NullTime
+	var txHash sql.NullString
+	var creditIssued sql.NullInt64
+
+	err := row.Scan(
+		&order.OrderID,
+		&order.UserID,
+		&order.RecipientAddress,
+		&order.DerivationIndex,
+		&order.CreditRequested,
+		&order.AmountPeaka,
+		&order.Denom,
+		&order.PriceSnapshot,
+		&order.ExpiresAt,
+		&order.Status,
+		&paidAt,
+		&txHash,
+		&creditIssued,
+		&order.CreatedAt,
+		&order.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if paidAt.Valid {
+		order.PaidAt = &paidAt.Time
+	}
+	if txHash.Valid {
+		order.TxHash = &txHash.String
+	}
+	if creditIssued.Valid {
+		order.CreditIssued = &creditIssued.Int64
+	}
+	return &order, nil
+}
+
+func (s *Store) GetOrderByRecipient(ctx context.Context, recipient string) (*models.Order, error) {
+	row := s.Pool.QueryRow(ctx, `
+		SELECT order_id, user_id, recipient_address, derivation_index,
+			credit_requested, amount_peaka, denom, price_snapshot,
+			expires_at, status, paid_at, tx_hash, credit_issued,
+			created_at, updated_at
+		FROM orders
+		WHERE recipient_address=$1
+		ORDER BY created_at DESC
 		LIMIT 1
 	`, recipient)
 

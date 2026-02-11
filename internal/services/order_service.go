@@ -9,6 +9,7 @@ import (
 
 	"DORAPollCredit/internal/chain"
 	"DORAPollCredit/internal/models"
+	"DORAPollCredit/internal/payments"
 	"DORAPollCredit/internal/pricing"
 	"DORAPollCredit/internal/store"
 
@@ -16,19 +17,19 @@ import (
 )
 
 var (
-	ErrMissingUserID   = errors.New("missing user id")
-	ErrInvalidCredit   = errors.New("credit below minimum")
+	ErrMissingUserID     = errors.New("missing user id")
+	ErrInvalidCredit     = errors.New("credit below minimum")
 	ErrXpubNotConfigured = errors.New("wallet xpub not configured")
 )
 
 type OrderService struct {
-	Store       *store.Store
-	Deriver     chain.AddressDeriver
-	Pricing     pricing.Service
-	MinCredit   int64
-	TTL         time.Duration
-	Denom       string
-	Decimals    int
+	Store     *store.Store
+	Deriver   chain.AddressDeriver
+	Pricing   pricing.Service
+	MinCredit int64
+	TTL       time.Duration
+	Denom     string
+	Decimals  int
 }
 
 func (s OrderService) CreateOrder(ctx context.Context, userID string, credit int64) (*models.Order, error) {
@@ -91,6 +92,18 @@ func (s OrderService) CreateOrder(ctx context.Context, userID string, credit int
 
 func (s OrderService) GetOrder(ctx context.Context, orderID string) (*models.Order, error) {
 	return s.Store.GetOrder(ctx, orderID)
+}
+
+func (s OrderService) GetOrderByRecipient(ctx context.Context, recipient string) (*models.Order, error) {
+	return s.Store.GetOrderByRecipient(ctx, recipient)
+}
+
+func (s OrderService) ListOrdersByStatus(ctx context.Context, status string, limit, offset int) ([]*models.Order, error) {
+	return s.Store.ListOrdersByStatus(ctx, status, limit, offset)
+}
+
+func (s OrderService) ApplyPayment(ctx context.Context, order *models.Order, tx chain.Tx, amount string, sender string) (models.OrderStatus, bool, error) {
+	return payments.ApplyPayment(ctx, s.Store, order, tx, amount, sender)
 }
 
 func calcAmountPeaka(creditRequested int64, creditPerDora int64, decimals int) (string, error) {

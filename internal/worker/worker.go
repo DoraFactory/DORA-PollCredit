@@ -2,22 +2,19 @@ package worker
 
 import (
 	"context"
-	"errors"
 	"log"
-	"math/big"
 	"strings"
 	"time"
 
 	"DORAPollCredit/internal/chain"
 	"DORAPollCredit/internal/models"
-	"DORAPollCredit/internal/pricing"
+	"DORAPollCredit/internal/payments"
 	"DORAPollCredit/internal/store"
 )
 
 type Worker struct {
 	Store               *store.Store
 	Chain               chain.Client
-	Pricing             pricing.Service
 	Denom               string
 	Decimals            int
 	ConfirmDepth        int64
@@ -166,7 +163,7 @@ func (w *Worker) scanOrder(ctx context.Context, order *models.Order, from, to in
 				if tx.Code != 0 {
 					continue
 				}
-				for _, t := range extractTransfers(tx.Events, order.Denom) {
+				for _, t := range payments.ExtractTransfers(tx.Events, order.Denom) {
 					if t.Recipient != order.RecipientAddress {
 						continue
 					}
@@ -186,115 +183,16 @@ func (w *Worker) scanOrder(ctx context.Context, order *models.Order, from, to in
 }
 
 func (w *Worker) applyPayment(ctx context.Context, order *models.Order, tx chain.Tx, amount string, sender string) error {
-	paidAt := tx.Timestamp
-	if paidAt.IsZero() {
-		paidAt = time.Now().UTC()
-	}
-
-	cmp := compareAmount(amount, order.AmountPeaka)
-	status := models.OrderPaid
-	var creditIssued *int64
-
-	switch {
-	case cmp < 0:
-		status = models.OrderUnderpaid
-	case cmp > 0:
-		status = models.OrderOverpaid
-	default:
-		if paidAt.After(order.ExpiresAt) {
-			status = models.OrderPaidLateReprice
-			credit, err := w.calcLateCredit(amount)
-			if err != nil {
-				return err
-			}
-			creditIssued = &credit
-		} else {
-			status = models.OrderPaid
-			creditIssued = &order.CreditRequested
-		}
-	}
-
-	payment := &models.Payment{
-		TxHash:      tx.Hash,
-		OrderID:     order.OrderID,
-		FromAddress: sender,
-		ToAddress:   order.RecipientAddress,
-		AmountPeaka: amount,
-		Denom:       order.Denom,
-		Height:      tx.Height,
-		BlockTime:   paidAt,
-	}
-	if err := w.Store.InsertPayment(ctx, payment); err != nil {
-		return err
-	}
-
-	updated, err := w.Store.UpdateOrderPayment(ctx, order.OrderID, status, paidAt, tx.Hash, creditIssued)
+	status, updated, err := payments.ApplyPayment(ctx, w.Store, order, tx, amount, sender)
 	if err != nil {
 		return err
 	}
-	if updated > 0 {
+	if updated {
 		log.Printf("order %s -> %s tx=%s amount=%s", order.OrderID, status, tx.Hash, amount)
 	}
 	return nil
 }
 
-func (w *Worker) calcLateCredit(paidPeaka string) (int64, error) {
-	snap, err := w.Pricing.CurrentSnapshot(context.Background())
-	if err != nil {
-		return 0, err
-	}
-
-	paid, ok := new(big.Int).SetString(paidPeaka, 10)
-	if !ok {
-		return 0, errors.New("invalid paid amount")
-	}
-
-	pow := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(w.Decimals)), nil)
-	num := new(big.Int).Mul(paid, big.NewInt(snap.CreditPerDora))
-	quot := new(big.Int).Quo(num, pow)
-	if !quot.IsInt64() {
-		return 0, errors.New("credit overflow")
-	}
-	return quot.Int64(), nil
-}
-
 func buildRecipientQuery(key, addr string) string {
 	return key + "='" + addr + "'"
-}
-
-func parseAmountForDenom(amount string, denom string) (string, bool) {
-	for _, coin := range strings.Split(amount, ",") {
-		coin = strings.TrimSpace(coin)
-		if coin == "" {
-			continue
-		}
-		idx := firstNonDigit(coin)
-		if idx <= 0 {
-			continue
-		}
-		amt := coin[:idx]
-		den := coin[idx:]
-		if den == denom {
-			return amt, true
-		}
-	}
-	return "", false
-}
-
-func firstNonDigit(s string) int {
-	for i, r := range s {
-		if r < '0' || r > '9' {
-			return i
-		}
-	}
-	return -1
-}
-
-func compareAmount(a, b string) int {
-	ai, ok1 := new(big.Int).SetString(a, 10)
-	bi, ok2 := new(big.Int).SetString(b, 10)
-	if !ok1 || !ok2 {
-		return 0
-	}
-	return ai.Cmp(bi)
 }

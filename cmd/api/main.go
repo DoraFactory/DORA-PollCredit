@@ -34,6 +34,20 @@ func main() {
 	st := store.New(pool)
 	pricingSvc := pricing.Service{FixedCreditPerDora: cfg.Pricing.FixedCreditPerDora}
 	deriver := chain.AddressDeriver{XPub: cfg.Wallet.XPub, Prefix: cfg.Chain.Bech32Prefix}
+	rpcEndpoints := cfg.Chain.RPCEndpoints
+	if len(rpcEndpoints) == 0 {
+		log.Fatalf("rpc_endpoints is empty")
+	}
+	var rpc chain.Client
+	if len(rpcEndpoints) > 1 {
+		client, err := chain.NewMultiRPCClient(rpcEndpoints, cfg.Worker.RPCFailoverThreshold)
+		if err != nil {
+			log.Fatalf("rpc client init failed: %v", err)
+		}
+		rpc = client
+	} else {
+		rpc = chain.NewRPCClient(rpcEndpoints[0])
+	}
 	orderSvc := &services.OrderService{
 		Store:     st,
 		Deriver:   deriver,
@@ -44,7 +58,7 @@ func main() {
 		Decimals:  cfg.Chain.Decimals,
 	}
 
-	h := internalhttp.NewHandler(orderSvc)
+	h := internalhttp.NewHandler(orderSvc, rpc)
 	srv := internalhttp.NewServer(h)
 
 	httpServer := &http.Server{
