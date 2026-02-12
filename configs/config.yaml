@@ -5,7 +5,7 @@ db:
   dsn: "postgres://postgres:postgres@127.0.0.1:5432/dora_pay?sslmode=disable"
 
 wallet:
-  xpub: "xpub6EKP71RFazTC4hH5adTpWBmb4EiFQCK8CysUpNcRvbNUr9T7oyCJLa2ef1mokidNae1FiZzLEp56BdeURf4yC7jaCmgR1xKz7xcDvhZ1vx2"
+  xpub: ""
 
 chain:
   chain_id: "vota-testnet"
