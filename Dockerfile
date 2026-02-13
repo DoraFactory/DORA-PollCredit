@@ -20,5 +20,6 @@ COPY --from=builder /out/api /app/api
 COPY --from=builder /out/worker /app/worker
 COPY --from=builder /out/migrate /app/migrate
 COPY configs/config.yaml /app/configs/config.yaml
+COPY migrations /app/migrations
 
 EXPOSE 8080
