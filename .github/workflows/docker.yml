@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Build and Push Docker Images
 
 on:
   push:
@@ -6,7 +6,8 @@ on:
   workflow_dispatch: {}
 
 env:
-  IMAGE_NAME: dora-pollcredit
+  API_IMAGE_NAME: dora-pollcredit
+  WEB_IMAGE_NAME: dora-pollcredit-web
 
 jobs:
   build:
@@ -31,21 +32,42 @@ jobs:
           password: ${{ secrets.DOCKER_HUB_PASS }}
 
       - name: Docker metadata
-        id: meta
+        id: meta_api
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKER_HUB_USER }}/${{ env.IMAGE_NAME }}
+          images: ${{ secrets.DOCKER_HUB_USER }}/${{ env.API_IMAGE_NAME }}
           tags: |
             type=raw,value=latest
             type=sha
 
-      - name: Build and push
+      - name: Build and push API image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta_api.outputs.tags }}
+          labels: ${{ steps.meta_api.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Docker metadata (web)
+        id: meta_web
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKER_HUB_USER }}/${{ env.WEB_IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: payment-app/Dockerfile
+          push: true
+          tags: ${{ steps.meta_web.outputs.tags }}
+          labels: ${{ steps.meta_web.outputs.labels }}
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
